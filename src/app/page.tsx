@@ -136,6 +136,7 @@ const TABS = [
   { key: 'salesDetail', label: '出库明细' },
   { key: 'purchaseDetail', label: '进货明细' },
   { key: 'customers', label: '部门管理' },
+  { key: 'suppliers', label: '供应商管理' },
   { key: 'export', label: '数据导出' },
   { key: 'users', label: '用户管理' },
 ] as const;
@@ -520,6 +521,11 @@ function MainApp({ authUser, onLogout }: { authUser: AuthUser; onLogout: () => v
           setCustomers(data);
           break;
         }
+        case 'suppliers': {
+          const data = await api.get('/api/suppliers');
+          setSuppliers(data);
+          break;
+        }
       }
     } catch (e) {
       console.error('Failed to load data:', e);
@@ -615,6 +621,9 @@ function MainApp({ authUser, onLogout }: { authUser: AuthUser; onLogout: () => v
             )}
             {activeTab === 'customers' && (
               <CustomerManagement />
+            )}
+            {activeTab === 'suppliers' && (
+              <SupplierManagement />
             )}
             {activeTab === 'export' && (
               <ExportModule />
@@ -2199,6 +2208,165 @@ function CustomerManagement() {
             <div className="flex justify-end gap-2 mt-4 pt-3 border-t">
               <button onClick={()=>setShowAdd(false)} className="px-4 py-1.5 rounded border border-gray-300 text-sm hover:bg-gray-50">取消</button>
               <button onClick={handleAdd} className="px-4 py-1.5 rounded bg-green-600 text-white text-sm font-medium hover:bg-green-700">确认添加</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ Supplier Management ============
+function SupplierManagement() {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState<number|null>(null);
+  const [editForm, setEditForm] = useState<Partial<Supplier>>({});
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ name:'', phone:'', contact:'', address:'', bank:'', account:'', remark:'' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<number|null>(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/suppliers');
+      const data = await res.json();
+      setSuppliers(data);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  const handleAdd = async () => {
+    if (!addForm.name.trim()) return alert('供应商名称不能为空');
+    await fetch('/api/suppliers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(addForm) });
+    setShowAdd(false);
+    setAddForm({ name:'', phone:'', contact:'', address:'', bank:'', account:'', remark:'' });
+    loadData();
+  };
+
+  const handleUpdate = async (id: number) => {
+    await fetch(`/api/suppliers/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(editForm) });
+    setEditId(null);
+    setEditForm({});
+    loadData();
+  };
+
+  const handleDelete = async (id: number) => {
+    await fetch(`/api/suppliers/${id}`, { method:'DELETE' });
+    setDeleteConfirm(null);
+    loadData();
+  };
+
+  const startEdit = (s: Supplier) => {
+    setEditId(s.id);
+    setEditForm({ name:s.name, phone:s.phone, contact:s.contact, address:s.address, bank:s.bank, account:s.account, remark:s.remark });
+  };
+
+  const filtered = suppliers.filter(s =>
+    s.name.includes(searchTerm) || (s.phone||'').includes(searchTerm) || (s.contact||'').includes(searchTerm)
+  );
+
+  const inputCls = "w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500";
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-gray-800 border-b-2 border-purple-600 pb-1">供应商信息管理</h3>
+        <div className="flex gap-2">
+          <input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="搜索供应商..." className="border border-gray-300 rounded px-3 py-1.5 text-sm w-48 focus:outline-none focus:border-blue-500" />
+          <button onClick={()=>setShowAdd(true)} className="bg-purple-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-purple-700 flex items-center gap-1">
+            <span className="text-lg leading-none">+</span> 新增供应商
+          </button>
+        </div>
+      </div>
+
+      {loading ? <div className="text-center py-10 text-gray-400">加载中...</div> : (
+      <div className="overflow-x-auto border border-gray-300 rounded">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-purple-600 text-white">
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">序号</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">供应商名称</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">电话</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">联系人</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">地址</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">开户银行</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">银行账号</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">备注</th>
+              <th className="border border-gray-400 px-3 py-2 text-center font-bold">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((s, i) => (
+              <tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50'}>
+                {editId === s.id ? (
+                  <>
+                    <td className="border border-gray-300 px-2 py-1 text-center">{i+1}</td>
+                    <td className="border border-gray-300 px-1 py-1"><input value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} className={inputCls} /></td>
+                    <td className="border border-gray-300 px-1 py-1"><input value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})} className={inputCls} /></td>
+                    <td className="border border-gray-300 px-1 py-1"><input value={editForm.contact||''} onChange={e=>setEditForm({...editForm,contact:e.target.value})} className={inputCls} /></td>
+                    <td className="border border-gray-300 px-1 py-1"><input value={editForm.address||''} onChange={e=>setEditForm({...editForm,address:e.target.value})} className={inputCls} /></td>
+                    <td className="border border-gray-300 px-1 py-1"><input value={editForm.bank||''} onChange={e=>setEditForm({...editForm,bank:e.target.value})} className={inputCls} /></td>
+                    <td className="border border-gray-300 px-1 py-1"><input value={editForm.account||''} onChange={e=>setEditForm({...editForm,account:e.target.value})} className={inputCls} /></td>
+                    <td className="border border-gray-300 px-1 py-1"><input value={editForm.remark||''} onChange={e=>setEditForm({...editForm,remark:e.target.value})} className={inputCls} /></td>
+                    <td className="border border-gray-300 px-2 py-1 text-center whitespace-nowrap">
+                      <button onClick={()=>handleUpdate(s.id)} className="bg-green-600 text-white px-2 py-0.5 rounded text-xs mr-1 hover:bg-green-700">保存</button>
+                      <button onClick={()=>{setEditId(null);setEditForm({});}} className="bg-gray-400 text-white px-2 py-0.5 rounded text-xs hover:bg-gray-500">取消</button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="border border-gray-300 px-2 py-1.5 text-center">{i+1}</td>
+                    <td className="border border-gray-300 px-3 py-1.5 font-medium">{s.name}</td>
+                    <td className="border border-gray-300 px-3 py-1.5">{s.phone||'-'}</td>
+                    <td className="border border-gray-300 px-3 py-1.5">{s.contact||'-'}</td>
+                    <td className="border border-gray-300 px-3 py-1.5">{s.address||'-'}</td>
+                    <td className="border border-gray-300 px-3 py-1.5">{s.bank||'-'}</td>
+                    <td className="border border-gray-300 px-3 py-1.5">{s.account||'-'}</td>
+                    <td className="border border-gray-300 px-3 py-1.5">{s.remark||'-'}</td>
+                    <td className="border border-gray-300 px-2 py-1.5 text-center whitespace-nowrap">
+                      {deleteConfirm===s.id ? (
+                        <>
+                          <span className="text-xs text-red-600 mr-1">确认?</span>
+                          <button onClick={()=>handleDelete(s.id)} className="bg-red-600 text-white px-2 py-0.5 rounded text-xs mr-1 hover:bg-red-700">是</button>
+                          <button onClick={()=>setDeleteConfirm(null)} className="bg-gray-400 text-white px-2 py-0.5 rounded text-xs hover:bg-gray-500">否</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={()=>startEdit(s)} className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs mr-1 hover:bg-blue-700">编辑</button>
+                          <button onClick={()=>setDeleteConfirm(s.id)} className="bg-red-500 text-white px-2 py-0.5 rounded text-xs hover:bg-red-600">删除</button>
+                        </>
+                      )}
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+            {filtered.length===0 && <tr><td colSpan={9} className="border border-gray-300 text-center py-8 text-gray-400">暂无供应商数据</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      )}
+      <div className="mt-2 text-sm text-gray-500">共 {filtered.length} 条记录</div>
+
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={()=>setShowAdd(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <h4 className="text-lg font-bold mb-4 border-b-2 border-purple-600 pb-2">新增供应商</h4>
+            <div className="space-y-3">
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">供应商名称 <span className="text-red-500">*</span></label><input value={addForm.name} onChange={e=>setAddForm({...addForm,name:e.target.value})} className={inputCls} placeholder="请输入供应商名称" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">电话</label><input value={addForm.phone} onChange={e=>setAddForm({...addForm,phone:e.target.value})} className={inputCls} placeholder="请输入电话" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">联系人</label><input value={addForm.contact} onChange={e=>setAddForm({...addForm,contact:e.target.value})} className={inputCls} placeholder="请输入联系人" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">地址</label><input value={addForm.address} onChange={e=>setAddForm({...addForm,address:e.target.value})} className={inputCls} placeholder="请输入地址" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">开户银行</label><input value={addForm.bank} onChange={e=>setAddForm({...addForm,bank:e.target.value})} className={inputCls} placeholder="请输入开户银行" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">银行账号</label><input value={addForm.account} onChange={e=>setAddForm({...addForm,account:e.target.value})} className={inputCls} placeholder="请输入银行账号" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">备注</label><textarea value={addForm.remark} onChange={e=>setAddForm({...addForm,remark:e.target.value})} className={inputCls+" h-16 resize-none"} placeholder="请输入备注" /></div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4 pt-3 border-t">
+              <button onClick={()=>setShowAdd(false)} className="px-4 py-1.5 rounded border border-gray-300 text-sm hover:bg-gray-50">取消</button>
+              <button onClick={handleAdd} className="px-4 py-1.5 rounded bg-purple-600 text-white text-sm font-medium hover:bg-purple-700">确认添加</button>
             </div>
           </div>
         </div>
