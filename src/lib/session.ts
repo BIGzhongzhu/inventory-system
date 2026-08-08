@@ -26,7 +26,7 @@ function getSecret(): string {
 async function getKey(): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
-    encoder.encode(getSecret()),
+    toArrayBuffer(encoder.encode(getSecret())),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign', 'verify'],
@@ -48,6 +48,11 @@ function b64urlToBytes(s: string): Uint8Array {
   return bytes;
 }
 
+/** 将 Uint8Array 转为独立的 ArrayBuffer，避免 TS 5.x+ 对 Uint8Array<ArrayBufferLike> 与 BufferSource 的泛型冲突。 */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(0);
+}
+
 export interface SessionData {
   id: number;
   username: string;
@@ -60,7 +65,7 @@ export interface SessionData {
 export async function signSession(data: SessionData): Promise<string> {
   const payload = bytesToB64url(encoder.encode(JSON.stringify(data)));
   const key = await getKey();
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const sig = await crypto.subtle.sign('HMAC', key, toArrayBuffer(encoder.encode(payload)));
   return `${payload}.${bytesToB64url(new Uint8Array(sig))}`;
 }
 
@@ -72,7 +77,7 @@ export async function verifySession(token: string | undefined | null): Promise<S
   const [payload, sig] = parts;
   try {
     const key = await getKey();
-    const ok = await crypto.subtle.verify('HMAC', key, b64urlToBytes(sig), encoder.encode(payload));
+    const ok = await crypto.subtle.verify('HMAC', key, toArrayBuffer(b64urlToBytes(sig)), toArrayBuffer(encoder.encode(payload)));
     if (!ok) return null;
     const data = JSON.parse(decoder.decode(b64urlToBytes(payload))) as SessionData;
     if (typeof data.exp === 'number' && data.exp < Date.now()) return null;
