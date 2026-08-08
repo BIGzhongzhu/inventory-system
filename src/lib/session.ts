@@ -50,7 +50,7 @@ function b64urlToBytes(s: string): Uint8Array {
 
 /** 将 Uint8Array 转为独立的 ArrayBuffer，避免 TS 5.x+ 对 Uint8Array<ArrayBufferLike> 与 BufferSource 的泛型冲突。 */
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(0);
+  return bytes.buffer.slice(0) as ArrayBuffer;
 }
 
 export interface SessionData {
