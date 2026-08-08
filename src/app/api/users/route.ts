@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClient } from '@/app/api/_db';
+import { verifySession } from '@/lib/session';
+
+// 用户管理属于敏感操作（可创建/提权账号），仅管理员可访问
+async function requireAdmin(request: NextRequest) {
+  const session = await verifySession(request.cookies.get('auth_token')?.value);
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 });
+  }
+  return null;
+}
 
 // GET - List all users (excluding password hashes)
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
   const client = getClient();
   const { data, error } = await client
     .from('users')
@@ -17,6 +30,9 @@ export async function GET() {
 
 // POST - Create a new user
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const { username, password, displayName, role } = await request.json();
 

@@ -1,8 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getClient } from '@/app/api/_db';
+import { verifySession } from '@/lib/session';
 
 // POST /api/reset - clear all data and re-seed with init_qty = 0
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // 清空全表属于高危操作，仅管理员可执行
+  const session = await verifySession(request.cookies.get('auth_token')?.value);
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 });
+  }
+
   const client = getClient();
   try {
     // Delete all order items first (foreign key constraint)

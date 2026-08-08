@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClient } from '@/app/api/_db';
+import { signSession, type SessionData } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,15 +31,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 });
     }
 
-    // Create session token (simple base64 encoded user info)
-    const sessionData = {
+    // 签发签名会话令牌（HMAC-SHA256，防伪造；私钥来自环境变量 SESSION_SECRET）
+    const sessionData: SessionData = {
       id: user.id,
       username: user.username,
       displayName: user.display_name,
       role: user.role,
       exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
     };
-    const token = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    const token = await signSession(sessionData);
 
     const response = NextResponse.json({
       success: true,

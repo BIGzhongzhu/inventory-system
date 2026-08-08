@@ -1,7 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getClient } from '@/app/api/_db';
+import { verifySession } from '@/lib/session';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // 备份包含全库数据（含 users.password_hash），仅管理员可访问
+  const session = await verifySession(request.cookies.get('auth_token')?.value);
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ error: '需要管理员权限' }, { status: 403 });
+  }
+
   const client = getClient();
   const lines: string[] = [];
 
